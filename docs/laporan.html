@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Laporan Topic 10 - REST API dan JSON Parsing</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font: 10.5pt/1.55 "Noto Sans", "Segoe UI", Arial, sans-serif; color: #1f2937; }
+  h1 { font-size: 18pt; margin: 0 0 4px; color: #0f766e; }
+  h2 { font-size: 13.5pt; color: #0f766e; border-bottom: 2px solid #ccebe7; padding-bottom: 3px; margin: 22px 0 10px; }
+  h3 { font-size: 11pt; margin: 14px 0 6px; }
+  .cover { border: 1px solid #d1d5db; border-radius: 8px; padding: 14px 18px; margin-bottom: 8px; }
+  .cover table td { padding: 2px 10px 2px 0; }
+  table.t { border-collapse: collapse; width: 100%; font-size: 9.5pt; margin: 6px 0 10px; }
+  table.t th, table.t td { border: 1px solid #d1d5db; padding: 5px 7px; text-align: left; vertical-align: top; }
+  table.t th { background: #f0fdfa; }
+  code { font: 9pt ui-monospace, "Noto Sans Mono", monospace; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }
+  figure { margin: 10px 0 16px; break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid #d1d5db; border-radius: 6px; }
+  figcaption { font-size: 9pt; color: #6b7280; margin-top: 4px; }
+  .phones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; break-inside: avoid; margin: 8px 0 14px; }
+  .phones figure { margin: 0; }
+  .pb { break-before: page; }
+  a { color: #0f766e; }
+  ul, ol { padding-left: 20px; } li { margin: 2px 0; }
+  .link { font-size: 12pt; padding: 10px 14px; background: #f0fdfa; border: 1px solid #99d6cd; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<h1>Laporan Praktikum Topic 10<br>REST API dengan CodeIgniter 4 &amp; JSON Parsing di Flutter</h1>
+<div class="cover">
+  <table>
+    <tr><td>Nama</td><td>: ______________________________</td></tr>
+    <tr><td>NIM</td><td>: ______________________________</td></tr>
+    <tr><td>Mata kuliah</td><td>: ______________________________ (Ilmu Komputer, Universitas Lambung Mangkurat)</td></tr>
+    <tr><td>Repository</td><td>: <a href="https://github.com/ichnasa/tugas-rest-api-umkm">https://github.com/ichnasa/tugas-rest-api-umkm</a></td></tr>
+  </table>
+</div>
+
+<h2>Ringkasan Implementasi</h2>
+<p>Praktik ini membangun REST API CRUD data UMKM dengan CodeIgniter 4, lalu mengonsumsinya dari aplikasi Flutter "Direktori UMKM". Kedua proyek disimpan dalam satu repository (monorepo): folder <code>backend/</code> dan <code>frontend/</code>.</p>
+
+<table class="t">
+  <tr><th style="width:22%">Bagian</th><th>Isi</th></tr>
+  <tr><td>Backend</td><td>CodeIgniter 4.7.6, PHP 8.4. <code>Api\UmkmController</code> (turunan <code>ResourceController</code>), <code>UmkmModel</code> dengan aturan validasi dan pesan error berbahasa Indonesia, migration + seeder tabel <code>umkm</code>, filter CORS, spesifikasi OpenAPI 3 dengan Swagger UI.</td></tr>
+  <tr><td>Database</td><td>Migration CI4 sehingga bisa dipakai di MySQL/MariaDB maupun SQLite. Pengujian lokal memakai SQLite; konfigurasi MySQL tersedia di <code>.env.example</code>.</td></tr>
+  <tr><td>Frontend</td><td>Flutter 3 (Material 3), package <code>http</code>. Model class <code>Umkm</code> dengan <code>fromJson</code>/<code>toJson</code>, <code>ApiResponse&lt;T&gt;</code> generik untuk base response, <code>UmkmService</code> + <code>ApiException</code>.</td></tr>
+  <tr><td>Fitur tambahan</td><td>Pagination (<code>meta</code>) + infinite scroll, pencarian, filter kategori, pull-to-refresh, halaman detail, error validasi server ditampilkan per field, dialog konfirmasi hapus, penanganan timeout/koneksi gagal.</td></tr>
+</table>
+
+<h3>Endpoint</h3>
+<table class="t">
+  <tr><th>Method</th><th>Endpoint</th><th>Fungsi</th><th>Status</th></tr>
+  <tr><td>GET</td><td><code>/api/umkm?page&amp;per_page&amp;search&amp;kategori</code></td><td>Daftar UMKM + pagination</td><td>200</td></tr>
+  <tr><td>GET</td><td><code>/api/umkm/{id}</code></td><td>Detail UMKM</td><td>200 / 404</td></tr>
+  <tr><td>POST</td><td><code>/api/umkm</code></td><td>Tambah UMKM</td><td>201 / 400</td></tr>
+  <tr><td>PUT</td><td><code>/api/umkm/{id}</code></td><td>Perbarui UMKM</td><td>200 / 400 / 404</td></tr>
+  <tr><td>DELETE</td><td><code>/api/umkm/{id}</code></td><td>Hapus UMKM</td><td>200 / 404</td></tr>
+</table>
+
+<h2 class="pb">1. Hasil Test API</h2>
+<p>Pengujian dilakukan terhadap server lokal (<code>php spark serve</code>, <code>http://localhost:8080</code>) memakai test console di <code>backend/public/tester/</code>. Halaman ini mengirim request sungguhan dengan <code>fetch()</code> lalu menampilkan request, body, status code, dan response JSON apa adanya. Hasil yang sama juga diverifikasi dengan <code>curl</code>. Swagger UI tersedia di <code>/docs/</code> sebagai dokumentasi OpenAPI.</p>
+
+<table class="t">
+  <tr><th>#</th><th>Skenario</th><th>Request</th><th>Hasil</th></tr>
+  <tr><td>1</td><td>Ambil daftar UMKM (pagination)</td><td><code>GET /api/umkm?page=1&amp;per_page=3</code></td><td>200, <code>meta.total_pages = 2</code></td></tr>
+  <tr><td>2</td><td>Ambil detail</td><td><code>GET /api/umkm/1</code></td><td>200</td></tr>
+  <tr><td>3</td><td>Tambah data valid</td><td><code>POST /api/umkm</code></td><td>201 Created</td></tr>
+  <tr><td>4</td><td>Tambah data tidak valid</td><td><code>POST /api/umkm</code></td><td>400, <code>errors</code> per field</td></tr>
+  <tr><td>5</td><td>Perbarui data</td><td><code>PUT /api/umkm/6</code></td><td>200</td></tr>
+  <tr><td>6</td><td>Hapus data</td><td><code>DELETE /api/umkm/6</code></td><td>200</td></tr>
+  <tr><td>7</td><td>Ambil data yang sudah dihapus</td><td><code>GET /api/umkm/6</code></td><td>404 Not Found</td></tr>
+  <tr><td>8</td><td>Search + filter kategori</td><td><code>GET /api/umkm?kategori=Kuliner&amp;search=Banjar</code></td><td>200</td></tr>
+</table>
+
+<figure><img src="screenshots/api-1.png"><figcaption>Gambar 1. GET daftar UMKM dengan pagination (data + meta).</figcaption></figure>
+<figure><img src="screenshots/api-2.png"><figcaption>Gambar 2. GET detail UMKM berdasarkan id.</figcaption></figure>
+<figure><img src="screenshots/api-3.png"><figcaption>Gambar 3. POST tambah UMKM, response 201 Created.</figcaption></figure>
+<figure><img src="screenshots/api-4.png"><figcaption>Gambar 4. POST dengan data tidak valid, response 400 dan pesan error per field.</figcaption></figure>
+<figure><img src="screenshots/api-5.png"><figcaption>Gambar 5. PUT perbarui UMKM, <code>updated_at</code> berubah.</figcaption></figure>
+<figure><img src="screenshots/api-6.png"><figcaption>Gambar 6. DELETE hapus UMKM.</figcaption></figure>
+<figure><img src="screenshots/api-7.png"><figcaption>Gambar 7. GET id yang sudah dihapus, response 404 Not Found.</figcaption></figure>
+<figure><img src="screenshots/api-8.png"><figcaption>Gambar 8. GET dengan filter kategori dan kata kunci pencarian.</figcaption></figure>
+
+<h3 class="pb">Hasil di Aplikasi Flutter</h3>
+<p>Aplikasi dijalankan sebagai Flutter Web (build release) dan mengakses API yang sama. Setiap aksi di aplikasi memanggil endpoint di atas.</p>
+<div class="phones">
+  <figure><img src="screenshots/app-1-list.png"><figcaption>List UMKM (GET)</figcaption></figure>
+  <figure><img src="screenshots/app-2-filter.png"><figcaption>Filter kategori Kuliner</figcaption></figure>
+  <figure><img src="screenshots/app-3-detail.png"><figcaption>Detail (GET /{id})</figcaption></figure>
+</div>
+<div class="phones">
+  <figure><img src="screenshots/app-4-validation.png"><figcaption>Validasi form</figcaption></figure>
+  <figure><img src="screenshots/app-5-form.png"><figcaption>Form tambah UMKM</figcaption></figure>
+  <figure><img src="screenshots/app-6-created.png"><figcaption>Berhasil ditambahkan (POST)</figcaption></figure>
+</div>
+<div class="phones">
+  <figure><img src="screenshots/app-7-edit.png"><figcaption>Form edit</figcaption></figure>
+  <figure><img src="screenshots/app-8-updated.png"><figcaption>Berhasil diperbarui (PUT)</figcaption></figure>
+  <figure><img src="screenshots/app-9-delete.png"><figcaption>Konfirmasi hapus (DELETE)</figcaption></figure>
+</div>
+
+<h2 class="pb">2. Refleksi Hasil</h2>
+
+<h3>Apa yang saya pelajari</h3>
+<ul>
+  <li><b>REST sebagai kontrak.</b> Backend dan frontend hanya terhubung lewat URL, method HTTP, status code, dan bentuk JSON. Setelah kontrak base response <code>{success, message, data, meta, errors}</code> disepakati, kedua sisi bisa dikerjakan terpisah. Status code yang tepat (201 untuk create, 400 untuk validasi, 404 untuk data tidak ada) membuat client cukup memeriksa kode dan field <code>success</code>, tanpa menebak dari isi pesan.</li>
+  <li><b>CodeIgniter 4 cukup ringkas untuk API.</b> <code>$routes-&gt;resource()</code> langsung memetakan GET/POST/PUT/DELETE ke method <code>index/show/create/update/delete</code>. Validasi cukup ditulis sekali di Model (<code>$validationRules</code> dan <code>$validationMessages</code>), lalu <code>$model-&gt;errors()</code> langsung menjadi isi <code>errors</code> di response. Migration dan seeder membuat database bisa dibuat ulang dengan satu perintah.</li>
+  <li><b>JSON parsing dengan model class.</b> Parsing manual <code>map['key']</code> cepat untuk mencoba, tetapi rawan typo dan error tipe. Model <code>Umkm.fromJson</code>/<code>toJson</code> membuat data type-safe, dan <code>ApiResponse&lt;T&gt;</code> generik dengan fungsi parser membuat satu kelas bisa dipakai untuk response list maupun objek tunggal.</li>
+  <li><b>Async di Dart.</b> <code>Future</code>, <code>async/await</code>, dan <code>try-catch</code> dipakai di setiap request. Saya menambahkan <code>.timeout()</code> dan mengubah semua kegagalan (timeout, server mati, JSON tidak valid, status 4xx/5xx) menjadi satu <code>ApiException</code>. Dengan begitu UI hanya perlu menangani satu jenis error.</li>
+  <li><b>http vs Dio.</b> Untuk CRUD sederhana, package <code>http</code> sudah cukup. Saya menulis sendiri hal yang di Dio sudah tersedia, misalnya header default, timeout, dan pemetaan error. Jika aplikasi membutuhkan token auth, logging, atau upload file, Dio dengan interceptor akan lebih rapi.</li>
+</ul>
+
+<h3>Kendala dan solusinya</h3>
+<table class="t">
+  <tr><th style="width:30%">Kendala</th><th>Penyebab &amp; solusi</th></tr>
+  <tr><td>Flutter Web gagal memanggil API (CORS)</td><td>Browser mengirim request <i>preflight</i> <code>OPTIONS</code> sebelum POST/PUT/DELETE dengan JSON. Solusinya mengisi <code>Config/Cors.php</code> (origin, header, method), memasang filter <code>cors</code> di grup route <code>api</code>, dan menambahkan route <code>options</code>. Hasilnya preflight dibalas <code>204</code> dengan header <code>Access-Control-Allow-*</code>.</td></tr>
+  <tr><td>MySQL lokal tidak bisa diakses (root memakai password)</td><td>Karena tabel dibuat lewat migration, driver cukup diganti ke SQLite3 di <code>.env</code> tanpa mengubah kode. Konfigurasi MySQL tetap disertakan di <code>.env.example</code>. Ini menunjukkan manfaat migration dibanding membuat tabel manual.</td></tr>
+  <tr><td><code>id</code> kadang terkirim sebagai string</td><td>Driver database bisa mengembalikan angka sebagai string. Di backend, <code>id</code> di-cast ke integer sebelum dikirim. Di Flutter, <code>fromJson</code> tetap memakai <code>int.tryParse(json['id'].toString())</code> agar aman untuk kedua kemungkinan.</td></tr>
+  <tr><td>Emulator Android tidak bisa akses <code>localhost</code></td><td>Di emulator, <code>localhost</code> menunjuk ke emulator itu sendiri. Base URL dibuat otomatis memakai <code>10.0.2.2</code> untuk Android dan bisa di-override dengan <code>--dart-define=API_BASE_URL</code>. Saya juga menambahkan izin <code>INTERNET</code> dan <code>usesCleartextTraffic</code> karena API masih HTTP.</td></tr>
+  <tr><td>Error validasi dari server perlu tampil di form</td><td>Isi <code>errors</code> pada response 400 disimpan di state form lalu dikembalikan oleh <code>validator</code> masing-masing field. Pesan dari server muncul tepat di bawah field yang salah, sama seperti validasi lokal.</td></tr>
+</table>
+
+<h3>Evaluasi dan pengembangan selanjutnya</h3>
+<ul>
+  <li>Kelima operasi (GET list, GET detail, POST, PUT, DELETE) berhasil diuji dari test console dan dari aplikasi Flutter. Jalur gagal (400 dan 404) juga mengembalikan format error yang konsisten.</li>
+  <li>API belum memakai autentikasi, jadi siapa pun bisa mengubah data. Langkah berikutnya adalah menambah login dengan token (misalnya CodeIgniter Shield atau JWT) dan mengirimnya lewat header <code>Authorization</code>. Pada tahap itu migrasi ke Dio dengan interceptor menjadi masuk akal.</li>
+  <li>Saat ini <code>PUT</code> juga menerima data parsial karena validasi CI4 hanya mengecek field yang dikirim saat update. Ke depan, <code>PATCH</code> sebaiknya dipisah untuk update parsial dan <code>PUT</code> mewajibkan semua field, sesuai semantik REST di materi.</li>
+  <li>Untuk produksi, <code>CI_ENVIRONMENT</code> harus diset ke <code>production</code> (header debugbar hilang), CORS dibatasi ke origin tertentu, dan API dijalankan lewat HTTPS.</li>
+</ul>
+
+<h2>3. Link Source Code</h2>
+<p class="link">GitHub (public, monorepo): <a href="https://github.com/ichnasa/tugas-rest-api-umkm">https://github.com/ichnasa/tugas-rest-api-umkm</a></p>
+<ul>
+  <li><code>backend/</code> &mdash; REST API CodeIgniter 4 (<code>app/Controllers/Api/UmkmController.php</code>, <code>app/Models/UmkmModel.php</code>, <code>app/Config/Routes.php</code>, migration &amp; seeder)</li>
+  <li><code>frontend/</code> &mdash; aplikasi Flutter (<code>lib/models</code>, <code>lib/services</code>, <code>lib/screens</code>)</li>
+  <li><code>docs/</code> &mdash; screenshot dan sumber laporan ini</li>
+</ul>
+<p>Cara menjalankan kedua proyek ada di <code>README.md</code> pada root repository.</p>
+
+</body>
+</html>
