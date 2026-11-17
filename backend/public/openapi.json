@@ -1,0 +1,112 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "REST API UMKM (CodeIgniter 4)",
+    "version": "1.0.0",
+    "description": "CRUD data UMKM. Semua response memakai base response `{ success, message, data, meta?, errors? }`."
+  },
+  "servers": [{ "url": "http://localhost:8080/api", "description": "Local (php spark serve)" }],
+  "tags": [{ "name": "UMKM" }],
+  "paths": {
+    "/umkm": {
+      "get": {
+        "tags": ["UMKM"],
+        "summary": "Ambil daftar UMKM (dengan pagination)",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Cari di nama, pemilik, alamat" },
+          { "name": "kategori", "in": "query", "schema": { "$ref": "#/components/schemas/Kategori" } }
+        ],
+        "responses": {
+          "200": { "description": "Berhasil", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } }
+        }
+      },
+      "post": {
+        "tags": ["UMKM"],
+        "summary": "Tambah UMKM",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UmkmInput" } } } },
+        "responses": {
+          "201": { "description": "Data UMKM berhasil ditambahkan", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ItemResponse" } } } },
+          "400": { "description": "Validasi gagal", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/umkm/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+      "get": {
+        "tags": ["UMKM"],
+        "summary": "Detail UMKM",
+        "responses": {
+          "200": { "description": "Berhasil", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ItemResponse" } } } },
+          "404": { "description": "Tidak ditemukan", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "put": {
+        "tags": ["UMKM"],
+        "summary": "Perbarui UMKM",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UmkmInput" } } } },
+        "responses": {
+          "200": { "description": "Data UMKM berhasil diperbarui", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ItemResponse" } } } },
+          "400": { "description": "Validasi gagal", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } },
+          "404": { "description": "Tidak ditemukan", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["UMKM"],
+        "summary": "Hapus UMKM",
+        "responses": {
+          "200": { "description": "Data UMKM berhasil dihapus" },
+          "404": { "description": "Tidak ditemukan", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Kategori": { "type": "string", "enum": ["Kuliner", "Fashion", "Kerajinan", "Jasa", "Pertanian", "Lainnya"] },
+      "UmkmInput": {
+        "type": "object",
+        "required": ["nama_umkm", "pemilik", "alamat", "kategori", "kontak"],
+        "properties": {
+          "nama_umkm": { "type": "string", "example": "Kopi Nusantara" },
+          "pemilik": { "type": "string", "example": "Rafi A" },
+          "alamat": { "type": "string", "example": "Jl. A. Yani No. 10, Banjarbaru" },
+          "kategori": { "$ref": "#/components/schemas/Kategori" },
+          "kontak": { "type": "string", "example": "08123456789" }
+        }
+      },
+      "Umkm": {
+        "allOf": [
+          { "type": "object", "properties": { "id": { "type": "integer", "example": 1 } } },
+          { "$ref": "#/components/schemas/UmkmInput" },
+          { "type": "object", "properties": { "created_at": { "type": "string" }, "updated_at": { "type": "string" } } }
+        ]
+      },
+      "Meta": {
+        "type": "object",
+        "properties": { "page": { "type": "integer" }, "per_page": { "type": "integer" }, "total": { "type": "integer" }, "total_pages": { "type": "integer" } }
+      },
+      "ListResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" }, "message": { "type": "string" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/Umkm" } },
+          "meta": { "$ref": "#/components/schemas/Meta" }
+        }
+      },
+      "ItemResponse": {
+        "type": "object",
+        "properties": { "success": { "type": "boolean" }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/Umkm" } }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Gagal menambahkan data UMKM" },
+          "errors": { "type": "object", "additionalProperties": { "type": "string" }, "example": { "nama_umkm": "Nama UMKM wajib diisi", "kategori": "Kategori tidak valid" } }
+        }
+      }
+    }
+  }
+}

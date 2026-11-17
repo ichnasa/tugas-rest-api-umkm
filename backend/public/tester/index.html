@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UMKM API Tester</title>
+<style>
+  :root { --bg:#0f172a; --card:#111827; --line:#1f2937; --fg:#e5e7eb; --mut:#94a3b8; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; --key:#93c5fd; --str:#86efac; --num:#fca5a5; --bool:#fcd34d; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--mut); margin-bottom: 20px; }
+  .case { background: var(--card); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
+  .head { display:flex; align-items:center; gap:10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .m { font: 700 12px ui-monospace, monospace; padding: 3px 8px; border-radius: 6px; color:#0b1020; }
+  .GET{background:#60a5fa}.POST{background:#4ade80}.PUT{background:#fbbf24}.DELETE{background:#f87171}
+  .url { font-family: ui-monospace, monospace; }
+  .title { margin-left:auto; color: var(--mut); }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; }
+  .pane { padding: 12px 16px; min-width: 0; }
+  .pane + .pane { border-left: 1px solid var(--line); }
+  .lbl { color: var(--mut); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; margin: 0 0 6px; }
+  pre { margin:0; font: 12.5px/1.55 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; }
+  .status { font-weight: 700; } .s2{color:var(--ok)} .s4{color:var(--warn)} .s5{color:var(--err)}
+  .k{color:var(--key)} .s{color:var(--str)} .n{color:var(--num)} .b{color:var(--bool)}
+  .meta { color: var(--mut); font-size: 12px; margin-top: 8px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } .pane + .pane { border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>UMKM REST API &mdash; Test Console</h1>
+  <div class="sub">Live request ke <span class="url" id="base"></span> (CodeIgniter 4). Buka dengan <code>#1</code>..<code>#8</code> untuk satu skenario, atau tanpa hash untuk semua.</div>
+  <div id="out"></div>
+</main>
+<script>
+const BASE = location.origin + '/api';
+document.getElementById('base').textContent = BASE;
+const body = { nama_umkm: 'Kopi Nusantara', pemilik: 'Rafi A', alamat: 'Jl. A. Yani No. 10, Banjarbaru', kategori: 'Kuliner', kontak: '08123456789' };
+const CASES = [
+  { t: '1. READ - daftar UMKM + pagination', m: 'GET', p: '/umkm?page=1&per_page=3' },
+  { t: '2. READ - detail UMKM', m: 'GET', p: '/umkm/1' },
+  { t: '3. CREATE - tambah UMKM', m: 'POST', p: '/umkm', b: body },
+  { t: '4. CREATE - validasi gagal (400)', m: 'POST', p: '/umkm', b: { nama_umkm: '', pemilik: 'Andi', alamat: 'Banjarbaru', kategori: 'Otomotif', kontak: 'abc' } },
+  { t: '5. UPDATE - perbarui UMKM', m: 'PUT', p: '/umkm/{last}', b: { ...body, nama_umkm: 'Kopi Nusantara Banua', kontak: '081299998888' } },
+  { t: '6. DELETE - hapus UMKM', m: 'DELETE', p: '/umkm/{last}' },
+  { t: '7. READ - id tidak ditemukan (404)', m: 'GET', p: '/umkm/{last}' },
+  { t: '8. READ - search & filter kategori', m: 'GET', p: '/umkm?kategori=Kuliner&search=Banjar' },
+];
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const hl = json => esc(JSON.stringify(json, null, 2)).replace(/("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?/g,
+  (m, str, colon, kw) => str ? (colon ? `<span class="k">${str}</span>${colon}` : `<span class="s">${str}</span>`) : kw ? `<span class="b">${m}</span>` : `<span class="n">${m}</span>`);
+
+async function lastId() {
+  const r = await fetch(BASE + '/umkm?per_page=1'); const j = await r.json();
+  return j.data[0]?.id;
+}
+async function run(c) {
+  const path = c.p.includes('{last}') ? c.p.replace('{last}', localStorage.getItem('lastId') || await lastId()) : c.p;
+  const opt = { method: c.m, headers: { Accept: 'application/json' } };
+  if (c.b) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(c.b); }
+  const t0 = performance.now();
+  const res = await fetch(BASE + path, opt);
+  const ms = Math.round(performance.now() - t0);
+  const json = await res.json();
+  if (c.m === 'POST' && res.status === 201) localStorage.setItem('lastId', json.data.id);
+  const req = [`${c.m} ${BASE + path}`, ...Object.entries(opt.headers).map(([k, v]) => `${k}: ${v}`)].join('\n');
+  const el = document.createElement('section');
+  el.className = 'case';
+  el.innerHTML = `
+    <div class="head"><span class="m ${c.m}">${c.m}</span><span class="url">/api${esc(path)}</span><span class="title">${c.t}</span></div>
+    <div class="grid">
+      <div class="pane"><div class="lbl">Request</div><pre>${esc(req)}</pre>
+        ${c.b ? `<div class="lbl" style="margin-top:12px">Body (JSON)</div><pre>${hl(c.b)}</pre>` : ''}</div>
+      <div class="pane"><div class="lbl">Response <span class="status s${String(res.status)[0]}">${res.status} ${res.statusText}</span></div>
+        <pre>${hl(json)}</pre>
+        <div class="meta">${ms} ms &middot; ${res.headers.get('content-type')}</div></div>
+    </div>`;
+  document.getElementById('out').appendChild(el);
+}
+(async () => {
+  const n = parseInt(location.hash.slice(1));
+  if (n) await run(CASES[n - 1]); else for (const c of CASES) await run(c);
+  document.body.dataset.done = '1';
+})();
+</script>
+</body>
+</html>
